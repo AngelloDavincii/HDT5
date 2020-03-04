@@ -8,15 +8,16 @@ y el ejemplo 4.10.1 de la pagina 43
 '''
 
 import random
-import pandas
+import pandas as pd
+from tabulate import tabulate
 import simpy
-import time
 import statistics
+import matplotlib.pyplot as plt
 
 RAMc = 100
 CPU = 1
 RANDOM_SEED = 10
-PROCESOS = 50
+PROCESOS = [25,50,100,150,200,250,300]
 INTERVAL = 10
 VELOCIDAD = 3
 IO = 1
@@ -35,20 +36,17 @@ def procesof(env, name,state,RAM):
 
     memoria = random.randint(1,10)   
     datos = random.randint(1,10)
-    print("El %s (State: %s) se creo en %d" % (name,state, env.now))
     with RAM.RAMa.get(memoria) as req1:
         yield req1
         state = "READY"
-        print("El %s (State: %s) obtiene %s de RAM en %d" % (name,state, memoria, env.now))
-        print("%s" %(RAM.RAMa.level))
+       
         siguiente = 0
         while datos >= 3 :
             with RAM.CPU.request() as req2:
-                print("El %s (State: %s) espera espacio en CPU en %d" % (name, state, env.now))
+                
                 yield req2
                 state = "RUNNING"
-                print("El %s (State: %s) esta en CPU en %d" % (name,state,env.now))
-
+            
                 datos = datos - VELOCIDAD
                 yield env.timeout(1)
                 if datos >= 3:
@@ -56,11 +54,10 @@ def procesof(env, name,state,RAM):
                 
                 
                 if siguiente == 1:
-                    print ("El %s esta en operaciones I/0 en %d" % (name, env.now))
+                    
                     yield env.timeout(IO)
             
         state = "TERMINATED"
-        print("El %s (State:%s) en %d" % (name,state , env.now))
         RAM.RAMa.put(memoria)
     fin = env.now
     tiempo.append(fin - inicio)
@@ -74,23 +71,38 @@ def generador(env, numero, intervalo, RAM):
         env.process(p)
         t = random.expovariate(1.0 / intervalo)
         yield env.timeout(t)
+print("--------------------RESUMEN DE LO SUCEDIDO--------------------------")
 
-
+def resumen(diccionario):
+    encabezado = ["Procesos","Promedio","Desviacion"]
+    df= pd.DataFrame(diccionario, columns = ["Cantidad_de_Procesos","Promedio","Desviacion"])
+    print (tabulate(df, headers = encabezado, tablefmt = "grid"))
+    df.plot(x = "Cantidad_de_Procesos", y = "Promedio", kind ="scatter")
+    plt.show()
     
 #Empezar la simulacion
-print("ESTO ES UNA COMPUTADORA")
-random.seed(RANDOM_SEED)
-env = simpy.Environment()
-RAMm = Memoria_RAM(env)
-env.process(generador(env, PROCESOS, INTERVAL, RAMm))
-env.run()
+def procesando():
+    datos = {"Cantidad_de_Procesos":[],"Promedio":[],"Desviacion":[]}
+    for i in PROCESOS:
+        random.seed(RANDOM_SEED)
+        env = simpy.Environment()
+        RAMm = Memoria_RAM(env)
+        env.process(generador(env, i, INTERVAL, RAMm))
+        env.run()
+        
+        
+        a = statistics.mean(tiempo)
+        b = statistics.stdev(tiempo)
+        datos["Cantidad_de_Procesos"].append(i)
+        datos["Promedio"].append(a)
+        datos["Desviacion"].append(b)
+
+    return datos
+
+revista = procesando()
+resumen(revista)
 
 
-print("\n"*2)
-print("--------------------RESUMEN DE LO SUCEDIDO--------------------------")
-print("")
-print("El tiempo promedio de cada proceso fue de ",statistics.mean(tiempo) )
-print("con una desviacion estandard de los datos de ",statistics.stdev(tiempo))
 
 
 
