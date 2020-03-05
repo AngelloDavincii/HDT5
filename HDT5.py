@@ -8,84 +8,86 @@ y el ejemplo 4.10.1 de la pagina 43
 '''
 
 import random
-import pandas
 import simpy
-import time
 import statistics
 
+#PARAMETROS PARA CAMBIAR
 RAMc = 100
 CPU = 1
-RANDOM_SEED = 10
+RANDOM_SEED = 5
 PROCESOS = 50
 INTERVAL = 10
 VELOCIDAD = 3
 IO = 1
 tiempo = []
 
+#Se crea clase para guardar memoria RAM y CPU
 class Memoria_RAM:
 
     def __init__(self, env):
         self.CPU = simpy.Resource(env, capacity = CPU)
         self.RAMa = simpy.Container(env, init = RAMc, capacity = RAMc)
-        #self.mon_proc = env.process(self.pantalla(env))
+  
 
     
 def procesof(env, name,state,RAM):
     inicio = env.now
-
-    memoria = random.randint(1,10)   
-    datos = random.randint(1,10)
+    memoria = random.randint(1,10) #RAM que se va a utilizar  
+    datos = random.randint(1,10) #Acciones a realizar en el CPU
     print("El %s (State: %s) se creo en %d" % (name,state, env.now))
-    with RAM.RAMa.get(memoria) as req1:
+    with RAM.RAMa.get(memoria) as req1:#Se retira la RAM a utilizar
         yield req1
-        state = "READY"
+        state = "READY"#Pasa a estado de ready
         print("El %s (State: %s) obtiene %s de RAM en %d" % (name,state, memoria, env.now))
-        print("%s" %(RAM.RAMa.level))
         siguiente = 0
-        while datos >= 3 :
-            with RAM.CPU.request() as req2:
+        while datos >= 3 :#mientras aun hayan 3 datos o mas datos a tratar
+            with RAM.CPU.request() as req2:#Se requiere atencion del CPU
                 print("El %s (State: %s) espera espacio en CPU en %d" % (name, state, env.now))
                 yield req2
                 state = "RUNNING"
                 print("El %s (State: %s) esta en CPU en %d" % (name,state,env.now))
 
-                datos = datos - VELOCIDAD
+                datos = datos - VELOCIDAD#Se procesa en el cpu las instrucciones
                 yield env.timeout(1)
-                if datos >= 3:
+                
+                if datos >= 3:#se genera numero random para ver si seguir corriendo o hacer I/O
                     siguiente = random.randint(1,2)
                 
-                
+                #Hace operaciones I/O
                 if siguiente == 1:
+                    state = "WAIT"
                     print ("El %s esta en operaciones I/0 en %d" % (name, env.now))
                     yield env.timeout(IO)
+                if siguiente == 0:
+                    datos = 0
             
         state = "TERMINATED"
         print("El %s (State:%s) en %d" % (name,state , env.now))
-        RAM.RAMa.put(memoria)
+        RAM.RAMa.put(memoria)#Se regresa RAM utilizada
     fin = env.now
-    tiempo.append(fin - inicio)
+    tiempo.append(fin - inicio)#Se calcula tiempo de este processo
         
-    
+#Metodo que genera los procesos
 def generador(env, numero, intervalo, RAM):
     for i in range(numero+1):
-        state = "WAIT"
-        
-        p = procesof(env, "Proceso %02d" % i, state, RAM)
+        t = random.expovariate(1.0 / intervalo) #intervalo de creacion   
+        state = "WAIT"#se crean con estado de wait
+        p =procesof(env, "Proceso %02d" % i, state, RAM)#se crea proceso
         env.process(p)
-        t = random.expovariate(1.0 / intervalo)
-        yield env.timeout(t)
+        yield env.timeout(t)#Tiempo que transcurrio para crear proceso
 
 
     
 #Empezar la simulacion
 print("ESTO ES UNA COMPUTADORA")
-random.seed(RANDOM_SEED)
-env = simpy.Environment()
-RAMm = Memoria_RAM(env)
-env.process(generador(env, PROCESOS, INTERVAL, RAMm))
-env.run()
+random.seed(RANDOM_SEED)#Se le coloca semilla al random para poder hacer comparaciones
+env = simpy.Environment()#Se crea el envirnment
+RAMm = Memoria_RAM(env) #Se renombra la memoriaRAM
+env.process(generador(env, PROCESOS, INTERVAL, RAMm))#Se crea el proceso
+env.run()#Se corre hasta que se acaben los procesos
 
-
+#RESUMEN
+#VER EL ARCHIVO DE ESTADISTICAS PARA VER MEJOR EL RESUMEN Y COMO SE OBTUVIERON PLOTS
 print("\n"*2)
 print("--------------------RESUMEN DE LO SUCEDIDO--------------------------")
 print("")
